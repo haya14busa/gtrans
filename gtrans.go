@@ -66,6 +66,7 @@ type Gtrans struct {
 
 func (gtrans *Gtrans) Translate(text, target string) (string, error) {
 	call := gtrans.srv.Translations.List([]string{text}, target)
+	call = call.Format("text")
 	resp, err := call.Do()
 	if err != nil {
 		return "", fmt.Errorf("fail to call translate API: %v", err)
