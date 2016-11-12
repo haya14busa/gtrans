@@ -59,3 +59,6 @@ Flags:
   -to string
         target language
 ```
+
+## Related projects
+- Vim plugin: https://github.com/haya14busa/vim-gtrans
