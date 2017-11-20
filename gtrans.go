@@ -15,7 +15,6 @@ import (
 	openbrowser "github.com/haya14busa/go-openbrowser"
 
 	"golang.org/x/oauth2"
-	"google.golang.org/api/googleapi/transport"
 	translate "google.golang.org/api/translate/v2"
 )
 
@@ -151,9 +150,6 @@ func runTranslation(w io.Writer, targetLang, text string) error {
 }
 
 func oauthClient(ctx context.Context, apiKey string) *http.Client {
-	ctx = context.WithValue(ctx, oauth2.HTTPClient, &http.Client{
-		Transport: &transport.APIKey{Key: apiKey},
-	})
 	oauthConfig := &oauth2.Config{}
 	token := &oauth2.Token{AccessToken: apiKey}
 	httpClient := oauthConfig.Client(ctx, token)
