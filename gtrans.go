@@ -12,11 +12,12 @@ import (
 	"os"
 	"strings"
 
+	"cloud.google.com/go/translate"
 	openbrowser "github.com/haya14busa/go-openbrowser"
-
 	"golang.org/x/oauth2"
+	"golang.org/x/text/language"
 	"google.golang.org/api/googleapi/transport"
-	translate "google.golang.org/api/translate/v2"
+	"google.golang.org/api/option"
 )
 
 const usageMessage = "" +
@@ -67,29 +68,6 @@ func main() {
 	}
 }
 
-type Gtrans struct {
-	srv *translate.Service
-}
-
-func (gtrans *Gtrans) Translate(text, target string) (string, error) {
-	call := gtrans.srv.Translations.List([]string{text}, target)
-	call = call.Format("text")
-	resp, err := call.Do()
-	if err != nil {
-		return "", fmt.Errorf("fail to call translate API: %v", err)
-	}
-	return resp.Translations[0].TranslatedText, nil
-}
-
-func (gtrans *Gtrans) Detect(text string) (string, error) {
-	call := gtrans.srv.Detections.List([]string{text})
-	resp, err := call.Do()
-	if err != nil {
-		return "", fmt.Errorf("fail to call detection API: %v", err)
-	}
-	return resp.Detections[0][0].Language, nil
-}
-
 func Main(r io.Reader, w io.Writer, targetLang string, doOpenBrowser bool) error {
 	if targetLang == "" {
 		var err error
@@ -126,27 +104,39 @@ func runTranslation(w io.Writer, targetLang, text string) error {
 	if apiKey == "" {
 		return errors.New("GOOGLE_TRANSLATE_API_KEY is not set")
 	}
-	service, err := translate.New(oauthClient(ctx, apiKey))
+
+	client, err := translate.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
 		return err
 	}
-	gtrans := &Gtrans{srv: service}
+	defer client.Close()
 
 	if sec := os.Getenv("GOOGLE_TRANSLATE_SECOND_LANG"); sec != "" {
-		detectedSourceLang, err := gtrans.Detect(text)
+		detectionsList, err := client.DetectLanguage(ctx, []string{text})
 		if err != nil {
 			return err
 		}
-		if detectedSourceLang == targetLang {
-			targetLang = sec
+		for _, detections := range detectionsList {
+			for _, detection := range detections {
+				if detection.Language.String() == targetLang {
+					targetLang = sec
+				}
+				break
+			}
 		}
 	}
-
-	translatedText, err := gtrans.Translate(text, targetLang)
+	targetLangTag, err := language.Parse(targetLang)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(w, translatedText)
+	opt := &translate.Options{}
+	translations, err := client.Translate(ctx, []string{text}, targetLangTag, opt)
+	if err != nil {
+		return err
+	}
+	for _, translation := range translations {
+		fmt.Fprintln(w, translation.Text)
+	}
 	return nil
 }
 
